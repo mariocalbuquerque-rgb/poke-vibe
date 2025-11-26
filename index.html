@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokéTeam Vibe Analyst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .poke-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); }
+        /* Cores dos Tipos */
+        .type-normal { background-color: #A8A77A; }
+        .type-fire { background-color: #EE8130; }
+        .type-water { background-color: #6390F0; }
+        .type-electric { background-color: #F7D02C; color: black; }
+        .type-grass { background-color: #7AC74C; }
+        .type-ice { background-color: #96D9D6; color: black; }
+        .type-fighting { background-color: #C22E28; }
+        .type-poison { background-color: #A33EA1; }
+        .type-ground { background-color: #E2BF65; }
+        .type-flying { background-color: #A98FF3; }
+        .type-psychic { background-color: #F95587; }
+        .type-bug { background-color: #A6B91A; }
+        .type-rock { background-color: #B6A136; }
+        .type-ghost { background-color: #735797; }
+        .type-dragon { background-color: #6F35FC; }
+        .type-dark { background-color: #705746; }
+        .type-steel { background-color: #B7B7CE; color: black; }
+        .type-fairy { background-color: #D685AD; }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen p-4 md:p-10 flex flex-col items-center">
+
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 mb-2">
+                PokéTeam
+            </h1>
+            <p class="text-slate-400">Monte seu time. Descubra as fraquezas. Compartilhe a vibe.</p>
+        </header>
+
+        <div class="w-full max-w-md relative mb-12">
+            <input
+                type="text"
+                v-model="searchQuery"
+                @keyup.enter="searchPokemon"
+                placeholder="Digite o nome (ex: gengar)..."
+                class="w-full p-4 rounded-full bg-slate-800 text-white border border-slate-700 focus:outline-none focus:border-yellow-400 shadow-lg text-lg"
+            >
+            <button @click="searchPokemon" class="absolute right-2 top-2 bg-yellow-400 text-black p-2 rounded-full font-bold hover:bg-yellow-300 transition px-6">
+                Buscar
+            </button>
+            <p v-if="error" class="text-red-400 mt-2 text-center text-sm">{{ error }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl mb-12">
+            <div v-for="(slot, index) in 6" :key="index" class="glass rounded-xl h-48 md:h-64 flex flex-col items-center justify-center relative transition-all duration-300" :class="team[index] ? 'poke-card' : 'opacity-50 border-dashed'">
+
+                <div v-if="!team[index]" class="text-slate-600 text-center">
+                    <span class="text-4xl">+</span>
+                    <p class="text-sm">Slot {{ index + 1 }}</p>
+                </div>
+
+                <div v-else class="w-full h-full p-4 flex flex-col items-center relative">
+                    <button @click="removePokemon(index)" class="absolute top-2 right-2 text-slate-500 hover:text-red-400">✕</button>
+                    <img :src="team[index].sprite" class="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-2xl z-10 -mt-2">
+                    <h3 class="capitalize font-bold text-lg mt-2">{{ team[index].name }}</h3>
+                    <div class="flex gap-2 mt-1">
+                        <span v-for="t in team[index].types" :key="t" :class="'type-' + t" class="text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-white shadow-sm">
+                            {{ t }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="team.length > 0" class="w-full max-w-4xl glass rounded-2xl p-6 md:p-8 animate-fade-in">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                📊 Relatório de Batalha
+            </h2>
+
+            <div v-if="loadingAnalysis" class="text-center py-10 text-yellow-400 animate-pulse">Calculando fraquezas...</div>
+
+            <div v-else class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-red-400 font-bold mb-4 uppercase text-sm tracking-widest">Seu time sofre muito dano de:</h3>
+                    <div class="flex flex-wrap gap-2" v-if="weaknesses.length > 0">
+                        <span v-for="w in weaknesses" :key="w.type" :class="'type-' + w.type" class="px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 text-white">
+                            {{ w.type }} <span class="bg-black bg-opacity-20 px-1.5 rounded text-xs">x{{ w.count }}</span>
+                        </span>
+                    </div>
+                    <p v-else class="text-slate-500 italic">Nenhuma fraqueza extrema encontrada!</p>
+                </div>
+
+                <div class="bg-slate-800 bg-opacity-50 p-4 rounded-lg border border-slate-700">
+                    <h4 class="text-yellow-400 font-bold text-sm mb-2">VIBE CHECK</h4>
+                    <p class="text-sm text-slate-300">
+                        {{ team.length < 6 ? 'Seu time ainda está incompleto. Adicione mais Pokémon para uma análise precisa.' : 'Time completo! Verifique se você tem counters para as fraquezas listadas ao lado.' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-20 text-slate-600 text-sm">
+            Feito via Vibe Coding • Dados da PokéAPI
+        </footer>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch } = Vue;
+
+        createApp({
+            setup() {
+                const searchQuery = ref('');
+                const team = ref([]);
+                const error = ref('');
+                const loadingAnalysis = ref(false);
+                const typeDamageRelations = ref({}); // Cache para dados de tipos
+
+                // Função para buscar Pokémon
+                const searchPokemon = async () => {
+                    if (!searchQuery.value) return;
+                    if (team.value.length >= 6) {
+                        error.value = "Seu time já está cheio (Máx 6)!";
+                        return;
+                    }
+
+                    error.value = '';
+                    try {
+                        const name = searchQuery.value.toLowerCase();
+                        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${name}`);
+
+                        if (!response.ok) throw new Error('Pokémon não encontrado!');
+
+                        const data = await response.json();
+
+                        const newPoke = {
+                            name: data.name,
+                            sprite: data.sprites.other['official-artwork'].front_default || data.sprites.front_default,
+                            types: data.types.map(t => t.type.name),
+                            stats: data.stats
+                        };
+
+                        team.value.push(newPoke);
+                        searchQuery.value = ''; // Limpar busca
+
+                        // Buscar dados de fraqueza dos tipos desse novo pokemon
+                        await fetchTypeData(newPoke.types);
+
+                    } catch (err) {
+                        error.value = err.message;
+                    }
+                };
+
+                const removePokemon = (index) => {
+                    team.value.splice(index, 1);
+                };
+
+                // Função auxiliar para pegar dados da API de Tipos
+                const fetchTypeData = async (types) => {
+                    loadingAnalysis.value = true;
+                    for (const typeName of types) {
+                        if (!typeDamageRelations.value[typeName]) {
+                            const res = await fetch(`https://pokeapi.co/api/v2/type/${typeName}`);
+                            const data = await res.json();
+                            typeDamageRelations.value[typeName] = data.damage_relations;
+                        }
+                    }
+                    loadingAnalysis.value = false;
+                };
+
+                // Lógica Computada para Calcular Fraquezas do Time
+                const weaknesses = computed(() => {
+                    if (team.value.length === 0) return [];
+
+                    let vulnerabilityCount = {};
+
+                    // Para cada pokemon no time
+                    team.value.forEach(poke => {
+                        // Para cada tipo desse pokemon (ex: Fire, Flying)
+                        poke.types.forEach(myType => {
+                            const relations = typeDamageRelations.value[myType];
+                            if (relations) {
+                                // Quem bate dobrado em mim? (double_damage_from)
+                                relations.double_damage_from.forEach(enemy => {
+                                    vulnerabilityCount[enemy.name] = (vulnerabilityCount[enemy.name] || 0) + 1;
+                                });
+                            }
+                        });
+                    });
+
+                    // Filtrar apenas ameaças relevantes (ex: 2 ou mais pokemons fracos contra X)
+                    return Object.entries(vulnerabilityCount)
+                        .map(([type, count]) => ({ type, count }))
+                        .sort((a, b) => b.count - a.count)
+                        .filter(item => item.count >= 1); // Mostra tudo que é fraqueza
+                });
+
+                return {
+                    searchQuery,
+                    team,
+                    error,
+                    searchPokemon,
+                    removePokemon,
+                    weaknesses,
+                    loadingAnalysis
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
